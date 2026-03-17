@@ -50,10 +50,70 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
   bool _statusError = false;
 
   String? _fileName;
+  bool _dragActive = false;
   List<DeclComponent> _components = const [];
   List<DeclNet> _nets = const [];
   List<DeclInstance> _instances = const [];
   List<DeclConnection> _connections = const [];
+
+  void _processFile(html.File file) {
+    setState(() {
+      _loading = true;
+      _statusError = false;
+      _statusMessage = 'Loading ${file.name}…';
+    });
+
+    final reader = html.FileReader();
+    reader.onLoadEnd.listen((_) {
+      try {
+        final text = reader.result as String? ?? '';
+        final parsed = parseDeclText(text);
+
+        final componentsJson = parsed['components'] as List<dynamic>? ?? [];
+        final schematicsJson = parsed['schematics'] as List<dynamic>? ?? [];
+        final firstSch =
+            (schematicsJson.isNotEmpty ? schematicsJson.first : null) as Map<String, dynamic>? ??
+                {};
+
+        final instancesJson = firstSch['instances'] as List<dynamic>? ?? [];
+        final netsJson = firstSch['nets'] as List<dynamic>? ?? [];
+        final connectionsJson = firstSch['connections'] as List<dynamic>? ?? [];
+
+        setState(() {
+          _components = componentsJson
+              .map((e) => DeclComponent.fromJson(e as Map<String, dynamic>))
+              .toList();
+          _nets = netsJson.map((e) => DeclNet.fromJson(e as Map<String, dynamic>)).toList();
+          _instances = instancesJson
+              .map((e) => DeclInstance.fromJson(e as Map<String, dynamic>))
+              .toList();
+          _connections = connectionsJson
+              .map((e) => DeclConnection.fromJson(e as Map<String, dynamic>))
+              .toList();
+
+          _fileName = file.name;
+          _statusMessage = 'Loaded from file: $_fileName';
+          _statusError = false;
+          _loading = false;
+        });
+      } catch (e) {
+        setState(() {
+          _statusMessage = 'Failed to load DECL file: $e';
+          _statusError = true;
+          _loading = false;
+        });
+      }
+    });
+    reader.onError.listen((error) {
+      setState(() {
+        _statusMessage = 'Failed to read DECL file.';
+        _statusError = true;
+        _loading = false;
+      });
+    });
+
+    reader.readAsText(file);
+  }
 
   Future<void> _loadDecl() async {
     final input = html.FileUploadInputElement()..accept = '.decl';
@@ -70,62 +130,7 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
       }
 
       final file = files.first;
-      setState(() {
-        _loading = true;
-        _statusError = false;
-        _statusMessage = 'Loading ${file.name}…';
-      });
-
-      final reader = html.FileReader();
-      reader.onLoadEnd.listen((_) {
-        try {
-          final text = reader.result as String? ?? '';
-          final parsed = parseDeclText(text);
-
-          final componentsJson = parsed['components'] as List<dynamic>? ?? [];
-          final schematicsJson = parsed['schematics'] as List<dynamic>? ?? [];
-          final firstSch =
-              (schematicsJson.isNotEmpty ? schematicsJson.first : null) as Map<String, dynamic>? ??
-                  {};
-
-          final instancesJson = firstSch['instances'] as List<dynamic>? ?? [];
-          final netsJson = firstSch['nets'] as List<dynamic>? ?? [];
-          final connectionsJson = firstSch['connections'] as List<dynamic>? ?? [];
-
-          setState(() {
-            _components = componentsJson
-                .map((e) => DeclComponent.fromJson(e as Map<String, dynamic>))
-                .toList();
-            _nets = netsJson.map((e) => DeclNet.fromJson(e as Map<String, dynamic>)).toList();
-            _instances = instancesJson
-                .map((e) => DeclInstance.fromJson(e as Map<String, dynamic>))
-                .toList();
-            _connections = connectionsJson
-                .map((e) => DeclConnection.fromJson(e as Map<String, dynamic>))
-                .toList();
-
-            _fileName = file.name;
-            _statusMessage = 'Loaded from file: $_fileName';
-            _statusError = false;
-            _loading = false;
-          });
-        } catch (e) {
-          setState(() {
-            _statusMessage = 'Failed to load DECL file: $e';
-            _statusError = true;
-            _loading = false;
-          });
-        }
-      });
-      reader.onError.listen((error) {
-        setState(() {
-          _statusMessage = 'Failed to read DECL file.';
-          _statusError = true;
-          _loading = false;
-        });
-      });
-
-      reader.readAsText(file);
+      _processFile(file);
     });
 
     input.click();
@@ -134,7 +139,39 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
   @override
   void initState() {
     super.initState();
-    // Wait for user to choose a DECL file via the browse button.
+    // Set up global drag-and-drop listeners for files (Flutter web only).
+    html.document.onDragOver.listen((event) {
+      event.preventDefault();
+      if (!mounted) return;
+      if (!_dragActive) {
+        setState(() {
+          _dragActive = true;
+        });
+      }
+    });
+
+    html.document.onDragLeave.listen((event) {
+      event.preventDefault();
+      if (!mounted) return;
+      if (_dragActive) {
+        setState(() {
+          _dragActive = false;
+        });
+      }
+    });
+
+    html.document.onDrop.listen((event) {
+      event.preventDefault();
+      if (!mounted) return;
+      setState(() {
+        _dragActive = false;
+      });
+
+      final files = event.dataTransfer?.files;
+      if (files != null && files.isNotEmpty) {
+        _processFile(files[0]);
+      }
+    });
   }
 
   @override
@@ -166,6 +203,45 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
                     message: _statusMessage,
                     isError: _statusError,
                   ),
+                  if (_fileName == null) ...[
+                    const SizedBox(height: 8),
+                    _GlassCard(
+                      child: Container(
+                        height: 80,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: _dragActive
+                                ? const Color(0xFF4ADE80)
+                                : const Color(0xFF94A3B8).withOpacity(0.4),
+                            width: 1.2,
+                          ),
+                          color: _dragActive
+                              ? const Color(0xFF064E3B).withOpacity(0.45)
+                              : const Color(0xFF020617).withOpacity(0.4),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Drag & drop a .decl file here',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '…or use the “Browse DECL file” button above',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.grey.shade400,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   Expanded(
                     child: SingleChildScrollView(
@@ -1683,13 +1759,31 @@ Map<String, dynamic> parseDeclText(String text) {
 
     if (currentComponent != null) {
       if (inPinsBlock) {
-        final pinMatch = RegExp(r'^(.+?):\s*(\w+)\s+as\s+(\w+)').firstMatch(line);
-        if (pinMatch != null) {
-          (currentComponent['pins'] as List<Map<String, dynamic>>).add({
-            'id': (pinMatch.group(1) ?? '').trim(),
-            'type': (pinMatch.group(2) ?? '').trim(),
-            'name': (pinMatch.group(3) ?? '').trim(),
+        // Support both legacy "id: Type as Name"
+        // and newer "Name: Type" pin syntaxes.
+        final pinMatchLegacy =
+            RegExp(r'^(.+?):\s*(\w+)\s+as\s+(\w+)').firstMatch(line);
+        final pinsList =
+            (currentComponent['pins'] as List<Map<String, dynamic>>);
+
+        if (pinMatchLegacy != null) {
+          pinsList.add({
+            'id': (pinMatchLegacy.group(1) ?? '').trim(),
+            'type': (pinMatchLegacy.group(2) ?? '').trim(),
+            'name': (pinMatchLegacy.group(3) ?? '').trim(),
           });
+        } else {
+          final pinMatchSimple =
+              RegExp(r'^(\w+)\s*:\s*(\w+)').firstMatch(line);
+          if (pinMatchSimple != null) {
+            final name = (pinMatchSimple.group(1) ?? '').trim();
+            final type = (pinMatchSimple.group(2) ?? '').trim();
+            pinsList.add({
+              'id': name,
+              'type': type,
+              'name': name,
+            });
+          }
         }
         continue;
       }

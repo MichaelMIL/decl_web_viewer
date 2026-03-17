@@ -1,0 +1,163 @@
+// Inline definition of the SPI protocol to replace missing import
+protocol spi {
+  lines { MOSI MISO SCLK CS }
+  role master { MOSI: Output MISO: Input SCLK: Output CS: Output }
+  role slave { MOSI: Input MISO: Output SCLK: Input CS: Input }
+}
+
+// Inline definition of C42600 component to replace missing import
+component C42600 {
+  pins {
+    DP: Bidirectional
+    DM: Bidirectional
+    VBUS: PowerInput
+    GND: PowerInput
+    CC1: Passive
+  }
+}
+
+// Inline definition of SPI_FLASH_4M component
+component SPI_FLASH_4M {
+  pins {
+    CS: Input
+    MOSI: Input
+    MISO: Output
+    SCLK: Input
+    GND: PowerInput
+  }
+}
+
+// Inline definition of RP2040_Zero component
+component RP2040_Zero {
+  pins {
+    GPIO_MOSI: Bidirectional
+    GPIO_MISO: Bidirectional
+    GPIO_SCLK: Bidirectional
+    GPIO_CS: Output
+    USB_DP: Bidirectional
+    USB_DM: Bidirectional
+    VBUS: PowerInput
+    GND: PowerInput
+    GPIO_BTN: Input           // Adding a button input
+  }
+  attributes {
+    pkg: Package = QFN56
+  }
+  features {
+    external GPIO using protocol spi role master {
+      MOSI -> pin GPIO_MOSI
+      MISO -> pin GPIO_MISO
+      SCLK -> pin GPIO_SCLK
+      CS -> pin GPIO_CS
+    }
+  }
+}
+
+// Inline definition of LED component to replace missing import
+component led {
+  pins {
+    ANODE: Input
+    CATHODE: Output
+  }
+  attributes {
+    color: Color
+  }
+}
+
+// Inline definition of Resistor component to replace missing import
+component Resistor {
+  pins {
+    from: Passive
+    to: Passive
+  }
+  attributes {
+    resistance: Resistance
+  }
+}
+
+// Inline definition of DecouplingCapacitor component to replace missing import
+component DecouplingCapacitor {
+  pins {
+    positive: Passive
+    negative: Passive
+  }
+  attributes {
+    capacitance: Capacitance
+  }
+}
+
+// Inline definition of Pushbutton component
+component Pushbutton {
+  pins {
+    TERMINAL_A: Passive
+    TERMINAL_B: Passive
+  }
+}
+
+schematic MainDesign {
+  instance U1: RP2040_Zero
+  instance U2: SPI_FLASH_4M
+  instance J1: C42600
+  instance D1: led {color = Green}
+  instance R1: Resistor {resistance = 330ohm}  // Current limiting resistor for LED
+  instance R2: Resistor {resistance = 5.1kohm} // Typical CC resistor value
+  instance C1: DecouplingCapacitor {capacitance = 100nF} 
+  instance C2: DecouplingCapacitor {capacitance = 10uF}  // Bulk decoupling
+  instance R3: Resistor {resistance = 10kohm} // Pull_up resistor for pushbutton
+  instance SW1: Pushbutton
+
+  net N_3V3
+  net N_5V
+  net GND
+  net SPI0_MOSI
+  net SPI0_MISO
+  net SPI0_SCLK
+  net SPI0_CS
+  net USB_DP
+  net USB_DM
+  net BUTTON_LINE
+
+  connect U1.GPIO_MOSI -- net SPI0_MOSI
+  connect U2.MOSI -- net SPI0_MOSI
+
+  connect U1.GPIO_MISO -- net SPI0_MISO
+  connect U2.MISO -- net SPI0_MISO
+
+  connect U1.GPIO_SCLK -- net SPI0_SCLK
+  connect U2.SCLK -- net SPI0_SCLK
+
+  connect U1.GPIO_CS -- U2.CS
+
+  connect U1.USB_DP -- net USB_DP
+  connect J1.DP -- net USB_DP
+
+  connect U1.USB_DM -- net USB_DM
+  connect J1.DM -- net USB_DM
+
+  connect J1.VBUS -- net N_5V
+  connect U1.VBUS -- net N_5V
+
+  connect U1.GPIO_MOSI -- R1.from
+  connect R1.to -- D1.ANODE
+  connect D1.CATHODE -- net GND
+
+  connect J1.GND -- net GND
+  connect U1.GND -- net GND
+  connect U2.GND -- net GND
+
+  connect R2.from -- J1.CC1
+  connect R2.to -- net GND
+  
+  connect C1.positive -- net N_3V3
+  connect C1.negative -- net GND
+
+  connect C2.positive -- net N_3V3
+  connect C2.negative -- net GND
+  
+  // Pushbutton and pull_up resistor connection
+  connect SW1.TERMINAL_A -- net BUTTON_LINE
+  connect SW1.TERMINAL_B -- net GND
+  connect R3.from -- net N_3V3
+  connect R3.to -- net BUTTON_LINE
+  connect U1.GPIO_BTN -- net BUTTON_LINE
+}

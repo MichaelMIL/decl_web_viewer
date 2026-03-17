@@ -1,0 +1,169 @@
+protocol SPI {
+    lines {
+        MOSI
+        MISO
+        CLK
+        SS
+    }
+
+    role master {
+        MOSI: Output
+        MISO: Input
+        CLK:  Output
+        SS:   Output
+    }
+
+    role slave {
+        MOSI: Input
+        MISO: Output
+        CLK:  Input
+        SS:   Input
+    }
+
+    rules {
+        master.MOSI -- slave.MOSI
+        slave.MISO  -- master.MISO
+        master.CLK  -- slave.CLK
+        master.SS   -- slave.SS
+    }
+}
+
+component USBC {
+  pins {
+    VBUS: PowerInput
+    GND: PowerInput
+    pin_CC1: Passive
+    pin_CC2: Passive
+  }
+}
+
+component StandardLED {
+  pins {
+    Anode: PowerInput
+    Cathode: Output
+  }
+}
+
+component PushButton {
+  pins {
+    One: Passive
+    Other: Passive
+  }
+}
+
+component Resistor {
+  pins {
+    one: Passive
+    other: Passive
+  }
+  attributes {
+    resistance: Resistance
+  }
+}
+
+component Capacitor {
+  pins {
+    positive: PowerInput
+    negative: PowerInput
+  }
+  attributes {
+    capacitance: Capacitance
+  }
+}
+
+component AMS1117_3_3V {
+  pins {
+    VIN: PowerInput
+    VOUT: PowerOutput
+    GND: PowerInput
+  }
+}
+
+component W25Q128JV {
+  pins {
+    CS_N: Input
+    DI: Input
+    DO: Output
+    CLK: Input
+    RESET_N: Input
+    GND: PowerInput
+    VCC: PowerInput
+  }
+}
+
+component CH32V003F4P6 {
+  pins {
+    VDD: PowerInput
+    VSS: PowerInput
+    PD0: Input       // Correct as needed based on device functionality
+    PC1: Output
+    PC5: Output
+    PC6: Output
+    PC7: Input
+    Reset: Input
+  }
+}
+
+schematic FinalDesign {
+  instance USBConn: USBC
+  instance LDOReg: AMS1117_3_3V
+  instance LED1: StandardLED
+  instance NORFlash: W25Q128JV
+  instance MCU: CH32V003F4P6
+  instance ResetBtn: PushButton
+  instance CC1: Resistor { resistance = 5.1kohm }
+  instance CC2: Resistor { resistance = 5.1kohm }
+  instance DecCap1: Capacitor { capacitance = 100nF }
+  instance DecCap2: Capacitor { capacitance = 100nF }
+  instance DecCap3: Capacitor { capacitance = 100nF }
+  instance InCap: Capacitor { capacitance = 10uF }
+  instance OutCap: Capacitor { capacitance = 10uF }
+  instance CLRes: Resistor { resistance = 330ohm }
+  instance PUR: Resistor { resistance = 10kohm }
+
+  net Net_5V_USB
+  net Net_GND
+  net Net_3V3
+  net Net_LED
+  net Net_SPI_CS
+  net Net_SPI_CLK
+  net Net_SPI_MOSI
+  net Net_SPI_MISO
+  net Net_RESET
+
+  connect USBConn.VBUS -- net Net_5V_USB
+  connect USBConn.GND -- net Net_GND
+  connect CC1.one -- USBConn.pin_CC1
+  connect CC2.one -- USBConn.pin_CC2
+  connect LDOReg.VIN -- net Net_5V_USB
+  connect LDOReg.VOUT -- net Net_3V3
+  connect LDOReg.GND -- net Net_GND
+  connect InCap.positive -- net Net_5V_USB
+  connect InCap.negative -- net Net_GND
+  connect OutCap.positive -- net Net_3V3
+  connect OutCap.negative -- net Net_GND
+  connect LED1.Anode -- net Net_3V3
+  connect LED1.Cathode -- MCU.PD0
+  connect CLRes.one -- MCU.PD0
+  connect CLRes.other -- LED1.Cathode
+  connect NORFlash.CS_N -- MCU.PC1
+  connect NORFlash.DI -- MCU.PC6
+  connect NORFlash.DO -- MCU.PC7
+  connect NORFlash.CLK -- MCU.PC5
+  connect NORFlash.RESET_N -- net Net_RESET
+  connect NORFlash.GND -- net Net_GND
+  connect NORFlash.VCC -- net Net_3V3
+  connect MCU.VDD -- net Net_3V3
+  connect MCU.VSS -- net Net_GND
+  connect MCU.Reset -- net Net_RESET
+  connect DecCap1.positive -- net Net_3V3
+  connect DecCap1.negative -- net Net_GND
+  connect DecCap2.positive -- net Net_3V3 
+  connect DecCap2.negative -- net Net_GND
+  connect DecCap3.positive -- LDOReg.VOUT
+  connect DecCap3.negative -- net Net_GND
+  connect ResetBtn.One -- MCU.Reset
+  connect ResetBtn.Other -- net Net_GND
+  connect PUR.one -- MCU.Reset
+  connect PUR.other -- net Net_3V3
+}
