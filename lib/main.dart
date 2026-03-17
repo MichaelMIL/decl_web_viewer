@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'dart:html' as html;
 
 void main() {
   runApp(const DeclViewerApp());
@@ -48,6 +49,7 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
   String _statusMessage = 'Waiting for data…';
   bool _statusError = false;
 
+  String? _fileName;
   List<DeclComponent> _components = const [];
   List<DeclNet> _nets = const [];
   List<DeclInstance> _instances = const [];
@@ -57,20 +59,45 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
     setState(() {
       _loading = true;
       _statusError = false;
-      _statusMessage = 'Loading from server…';
+      _statusMessage = 'Waiting for DECL file…';
     });
 
     try {
-      // For Flutter web, the app is typically served from a different dev
-      // server than the Node backend. Point directly at the Node server.
-      final uri = Uri.parse('http://localhost:3000/api/decl');
-      final res = await http.get(uri);
-      if (res.statusCode != 200) {
-        throw Exception('HTTP ${res.statusCode}');
+      final input = html.FileUploadInputElement()
+        ..accept = '.decl'
+        ..click();
+
+      final completer = Completer<html.File?>();
+      input.onChange.listen((event) {
+        final files = input.files;
+        if (files != null && files.isNotEmpty) {
+          completer.complete(files.first);
+        } else {
+          completer.complete(null);
+        }
+      });
+
+      final file = await completer.future;
+      if (file == null) {
+        setState(() {
+          _loading = false;
+          _statusMessage = 'File selection cancelled.';
+        });
+        return;
       }
 
-      final jsonBody = json.decode(res.body) as Map<String, dynamic>;
-      final parsed = jsonBody['parsed'] as Map<String, dynamic>? ?? {};
+      final reader = html.FileReader();
+      final readCompleter = Completer<String>();
+      reader.onLoadEnd.listen((_) {
+        readCompleter.complete(reader.result as String? ?? '');
+      });
+      reader.onError.listen((error) {
+        readCompleter.completeError(error ?? 'Failed to read file');
+      });
+      reader.readAsText(file);
+
+      final text = await readCompleter.future;
+      final parsed = parseDeclText(text);
 
       final componentsJson = parsed['components'] as List<dynamic>? ?? [];
       final schematicsJson = parsed['schematics'] as List<dynamic>? ?? [];
@@ -92,11 +119,8 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
             .map((e) => DeclConnection.fromJson(e as Map<String, dynamic>))
             .toList();
 
-        final filePath = jsonBody['filePath'] as String?;
-        final fileName = (filePath != null && filePath.contains('/'))
-            ? filePath.substring(filePath.lastIndexOf('/') + 1)
-            : 'esp32-led-test.decl';
-        _statusMessage = 'Loaded from file: $fileName';
+        _fileName = file.name;
+        _statusMessage = 'Loaded from file: $_fileName';
         _statusError = false;
         _loading = false;
       });
@@ -112,13 +136,17 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
   @override
   void initState() {
     super.initState();
-    _loadDecl();
+    // Wait for user to choose a DECL file via the browse button.
   }
 
   @override
   Widget build(BuildContext context) {
     final compCount = _components.length;
     final netCount = _nets.length;
+    final headerSubtitle = _fileName ?? 'no file selected';
+    final headerTitle = _fileName != null
+        ? _fileName!.replaceAll('.decl', '')
+        : 'DECL Viewer';
 
     return Scaffold(
       body: SafeArea(
@@ -130,8 +158,8 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
               child: Column(
                 children: [
                   _HeaderBar(
-                    title: 'ESP32 LED Test',
-                    subtitle: 'esp32-led-test.decl',
+                    title: headerTitle,
+                    subtitle: headerSubtitle,
                     onReload: _loading ? null : _loadDecl,
                     loading: _loading,
                   ),
@@ -347,7 +375,7 @@ class _HeaderBar extends StatelessWidget {
               ),
               icon: const Icon(Icons.refresh, size: 16),
               label: Text(
-                loading ? 'Loading…' : 'Reload from file',
+                loading ? 'Loading…' : 'Browse DECL file',
                 style: const TextStyle(fontSize: 12),
               ),
             ),
@@ -1602,6 +1630,160 @@ class _InstanceLayout {
     required this.pins,
     required this.side,
   });
+}
+
+Map<String, dynamic> parseDeclText(String text) {
+  final lines = const LineSplitter().convert(text);
+
+  final components = <Map<String, dynamic>>[];
+  final schematics = <Map<String, dynamic>>[];
+
+  Map<String, dynamic>? currentComponent;
+  Map<String, dynamic>? currentSchematic;
+  var inPinsBlock = false;
+  var inAttributesBlock = false;
+
+  for (final rawLine in lines) {
+    final line = rawLine.trim();
+    if (line.isEmpty) continue;
+
+    final compMatch = RegExp(r'^component\s+(\w+)\s*\{').firstMatch(line);
+    if (compMatch != null) {
+      currentComponent = {
+        'name': compMatch.group(1) ?? '',
+        'pins': <Map<String, dynamic>>[],
+        'attributes': <String, dynamic>{},
+      };
+      components.add(currentComponent);
+      inPinsBlock = false;
+      inAttributesBlock = false;
+      continue;
+    }
+
+    if (line == 'pins {') {
+      inPinsBlock = true;
+      inAttributesBlock = false;
+      continue;
+    }
+
+    if (line == 'attributes {') {
+      inPinsBlock = false;
+      inAttributesBlock = true;
+      continue;
+    }
+
+    if (line == '}' || line == '};') {
+      if (currentSchematic != null && line == '}') {
+        currentSchematic = null;
+      } else if (currentComponent != null && line == '}') {
+        currentComponent = null;
+      }
+      inPinsBlock = false;
+      inAttributesBlock = false;
+      continue;
+    }
+
+    if (currentComponent != null) {
+      if (inPinsBlock) {
+        final pinMatch = RegExp(r'^(.+?):\s*(\w+)\s+as\s+(\w+)').firstMatch(line);
+        if (pinMatch != null) {
+          (currentComponent['pins'] as List<Map<String, dynamic>>).add({
+            'id': (pinMatch.group(1) ?? '').trim(),
+            'type': (pinMatch.group(2) ?? '').trim(),
+            'name': (pinMatch.group(3) ?? '').trim(),
+          });
+        }
+        continue;
+      }
+
+      if (inAttributesBlock) {
+        final attrMatch =
+            RegExp(r'^(\w+):\s*([\w]+)\s*=\s*(.+)$').firstMatch(line);
+        if (attrMatch != null) {
+          final key = attrMatch.group(1) ?? '';
+          final valueType = attrMatch.group(2) ?? '';
+          var value = attrMatch.group(3) ?? '';
+          value = value.replaceAll(RegExp(r';$'), '').trim();
+          (currentComponent['attributes'] as Map<String, dynamic>)[key] = {
+            'type': valueType,
+            'value': value,
+          };
+        }
+        continue;
+      }
+    }
+
+    final schMatch = RegExp(r'^schematic\s+(\w+)\s*\{').firstMatch(line);
+    if (schMatch != null) {
+      currentSchematic = {
+        'name': schMatch.group(1) ?? '',
+        'instances': <Map<String, dynamic>>[],
+        'nets': <Map<String, dynamic>>[],
+        'connections': <Map<String, dynamic>>[],
+      };
+      schematics.add(currentSchematic);
+      continue;
+    }
+
+    if (currentSchematic != null) {
+      final instMatch =
+          RegExp(r'^instance\s+(\w+):\s*(\w+)(\s*\{.*\})?').firstMatch(line);
+      if (instMatch != null) {
+        final instance = <String, dynamic>{
+          'name': instMatch.group(1) ?? '',
+          'component': instMatch.group(2) ?? '',
+          'raw': line,
+          'attributes': <String, dynamic>{},
+        };
+
+        final overridesRaw = instMatch.group(3);
+        if (overridesRaw != null) {
+          final inner = overridesRaw
+              .replaceAll(RegExp(r'^\s*\{\s*'), '')
+              .replaceAll(RegExp(r'\s*\}\s*$'), '');
+          for (final part in inner.split(',')) {
+            final trimmed = part.trim();
+            if (trimmed.isEmpty) continue;
+            final ovMatch =
+                RegExp(r'^(\w+)\s*=\s*(.+)$').firstMatch(trimmed);
+            if (ovMatch != null) {
+              final key = ovMatch.group(1)!;
+              var value = ovMatch.group(2) ?? '';
+              value = value.replaceAll(RegExp(r';$'), '').trim();
+              (instance['attributes'] as Map<String, dynamic>)[key] = value;
+            }
+          }
+        }
+
+        (currentSchematic['instances'] as List<Map<String, dynamic>>)
+            .add(instance);
+        continue;
+      }
+
+      final netMatch = RegExp(r'^net\s+(\w+)').firstMatch(line);
+      if (netMatch != null) {
+        (currentSchematic['nets'] as List<Map<String, dynamic>>).add({
+          'name': netMatch.group(1) ?? '',
+        });
+        continue;
+      }
+
+      final connMatch =
+          RegExp(r'^connect\s+([\w\.]+)\s*--\s*net\s+(\w+)').firstMatch(line);
+      if (connMatch != null) {
+        (currentSchematic['connections'] as List<Map<String, dynamic>>).add({
+          'endpoint': connMatch.group(1) ?? '',
+          'net': connMatch.group(2) ?? '',
+        });
+        continue;
+      }
+    }
+  }
+
+  return {
+    'components': components,
+    'schematics': schematics,
+  };
 }
 
 class _NetPinRef {

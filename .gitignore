@@ -61,8 +61,8 @@ Thumbs.db
 .cache
 
 # Flutter
-/flutter/.dart_tool/
-/flutter/build/
-/flutter/.flutter-plugins
-/flutter/.flutter-plugins-dependencies
-/flutter/.packages
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages

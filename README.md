@@ -1,64 +1,45 @@
 # DECL Web Viewer
 
-Web server and UI for visualizing DECL schematic files.
+Flutter and web-based tools for visualizing DECL schematic files.
 
 ## Overview
 
-This project provides:
+This repo contains:
 
-- A small Node/Express server (`src/server.js`) to serve static assets and example DECL files.
-- A browser-based viewer UI (under `public/`) for exploring and visualizing `.decl` schematic files.
+- **Flutter app** under `flutter/` – a modern DECL viewer UI that:
+  - Lets you **browse and load any `.decl` file** directly in the browser (no backend required for Flutter web).
+  - Renders:
+    - A **topology view** (components and nets).
+    - A **detailed schematic view** (instances, pins, and nets).
+    - A **PCB-style view** (board-style representation derived from the same schematic).
 
-## Prerequisites
+### Prerequisites
 
-- Node.js >= 18
-- npm (comes with Node)
+- Flutter SDK (3.x)
+- A recent Chrome browser (for Flutter web)
 
-## Installation
+### Running the Flutter app
 
-From the project root:
-
-```bash
-npm install
-```
-
-This will install the server and development dependencies (Express, Morgan, Nodemon, etc.).
-
-## Running the Server
-
-Start the server in normal mode:
+From the repo root:
 
 ```bash
-npm start
+cd flutter
+flutter pub get
+flutter run -d chrome
 ```
 
-Start the server in development mode (with auto-restart via Nodemon):
+This will open the DECL viewer in Chrome.
 
-```bash
-npm run dev
-```
+### Using the Flutter viewer
 
-By default, the server listens on the port configured in `src/server.js` (often `3000` or similar). Once running, open your browser and navigate to that port, for example:
+- Click the **“Browse DECL file”** button in the header.
+- Choose any `.decl` file from your machine.
+- The UI will update to show:
+  - **Topology**: components and nets from the file.
+  - **Schematic view**: instance pins and net connections.
+  - **PCB view**: a board-style visualization based on the same schematic.
 
-```text
-http://localhost:3000
-```
-
-## Project Structure
-
-- `src/server.js` - Express server entry point.
-- `public/` - Static front-end assets and the main HTML/JS/CSS for the DECL viewer UI.
-- `examples/decls/` - Sample `.decl` schematic files you can load in the viewer.
-- `package.json` - Project metadata, scripts, and dependencies.
-
-## Working with Example DECL Files
-
-Example DECL files live under `examples/decls/` (for example `esp32-led-test.decl`). The server is set up to serve these files so that the front-end viewer can load them. Use the UI controls in the browser to select and visualize an example file.
-
-## Development Notes
-
-- Use `npm run dev` during development so the server reloads automatically on changes.
-- If you change front-end files under `public/`, simply refresh the browser to see updates.
+The header title and subtitle update dynamically based on the selected file name.
 
 ## License
 
