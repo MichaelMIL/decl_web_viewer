@@ -23,7 +23,6 @@ This repo contains:
 From the repo root:
 
 ```bash
-cd flutter
 flutter pub get
 flutter run -d chrome
 ```
