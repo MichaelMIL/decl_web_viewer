@@ -56,81 +56,79 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
   List<DeclConnection> _connections = const [];
 
   Future<void> _loadDecl() async {
-    setState(() {
-      _loading = true;
-      _statusError = false;
-      _statusMessage = 'Waiting for DECL file…';
-    });
+    final input = html.FileUploadInputElement()..accept = '.decl';
 
-    try {
-      final input = html.FileUploadInputElement()
-        ..accept = '.decl'
-        ..click();
-
-      final completer = Completer<html.File?>();
-      input.onChange.listen((event) {
-        final files = input.files;
-        if (files != null && files.isNotEmpty) {
-          completer.complete(files.first);
-        } else {
-          completer.complete(null);
-        }
-      });
-
-      final file = await completer.future;
-      if (file == null) {
+    input.onChange.listen((event) {
+      final files = input.files;
+      if (files == null || files.isEmpty) {
         setState(() {
           _loading = false;
+          _statusError = false;
           _statusMessage = 'File selection cancelled.';
         });
         return;
       }
 
+      final file = files.first;
+      setState(() {
+        _loading = true;
+        _statusError = false;
+        _statusMessage = 'Loading ${file.name}…';
+      });
+
       final reader = html.FileReader();
-      final readCompleter = Completer<String>();
       reader.onLoadEnd.listen((_) {
-        readCompleter.complete(reader.result as String? ?? '');
+        try {
+          final text = reader.result as String? ?? '';
+          final parsed = parseDeclText(text);
+
+          final componentsJson = parsed['components'] as List<dynamic>? ?? [];
+          final schematicsJson = parsed['schematics'] as List<dynamic>? ?? [];
+          final firstSch =
+              (schematicsJson.isNotEmpty ? schematicsJson.first : null) as Map<String, dynamic>? ??
+                  {};
+
+          final instancesJson = firstSch['instances'] as List<dynamic>? ?? [];
+          final netsJson = firstSch['nets'] as List<dynamic>? ?? [];
+          final connectionsJson = firstSch['connections'] as List<dynamic>? ?? [];
+
+          setState(() {
+            _components = componentsJson
+                .map((e) => DeclComponent.fromJson(e as Map<String, dynamic>))
+                .toList();
+            _nets = netsJson.map((e) => DeclNet.fromJson(e as Map<String, dynamic>)).toList();
+            _instances = instancesJson
+                .map((e) => DeclInstance.fromJson(e as Map<String, dynamic>))
+                .toList();
+            _connections = connectionsJson
+                .map((e) => DeclConnection.fromJson(e as Map<String, dynamic>))
+                .toList();
+
+            _fileName = file.name;
+            _statusMessage = 'Loaded from file: $_fileName';
+            _statusError = false;
+            _loading = false;
+          });
+        } catch (e) {
+          setState(() {
+            _statusMessage = 'Failed to load DECL file: $e';
+            _statusError = true;
+            _loading = false;
+          });
+        }
       });
       reader.onError.listen((error) {
-        readCompleter.completeError(error ?? 'Failed to read file');
+        setState(() {
+          _statusMessage = 'Failed to read DECL file.';
+          _statusError = true;
+          _loading = false;
+        });
       });
+
       reader.readAsText(file);
+    });
 
-      final text = await readCompleter.future;
-      final parsed = parseDeclText(text);
-
-      final componentsJson = parsed['components'] as List<dynamic>? ?? [];
-      final schematicsJson = parsed['schematics'] as List<dynamic>? ?? [];
-      final firstSch =
-          (schematicsJson.isNotEmpty ? schematicsJson.first : null) as Map<String, dynamic>? ??
-              {};
-
-      final instancesJson = firstSch['instances'] as List<dynamic>? ?? [];
-      final netsJson = firstSch['nets'] as List<dynamic>? ?? [];
-      final connectionsJson = firstSch['connections'] as List<dynamic>? ?? [];
-
-      setState(() {
-        _components =
-            componentsJson.map((e) => DeclComponent.fromJson(e as Map<String, dynamic>)).toList();
-        _nets = netsJson.map((e) => DeclNet.fromJson(e as Map<String, dynamic>)).toList();
-        _instances =
-            instancesJson.map((e) => DeclInstance.fromJson(e as Map<String, dynamic>)).toList();
-        _connections = connectionsJson
-            .map((e) => DeclConnection.fromJson(e as Map<String, dynamic>))
-            .toList();
-
-        _fileName = file.name;
-        _statusMessage = 'Loaded from file: $_fileName';
-        _statusError = false;
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _statusMessage = 'Failed to load DECL file: $e';
-        _statusError = true;
-        _loading = false;
-      });
-    }
+    input.click();
   }
 
   @override
