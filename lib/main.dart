@@ -1861,8 +1861,10 @@ Map<String, dynamic> parseDeclText(String text) {
         continue;
       }
 
-      final connMatch =
-          RegExp(r'^connect\s+([\w\.]+)\s*--\s*net\s+(\w+)').firstMatch(line);
+      // connect inst.pin [as Alias] -- net NET_NAME
+      final connMatch = RegExp(
+        r'^connect\s+([\w\.]+)(?:\s+as\s+\w+)?\s*--\s*net\s+(\w+)',
+      ).firstMatch(line);
       if (connMatch != null) {
         (currentSchematic['connections'] as List<Map<String, dynamic>>).add({
           'endpoint': connMatch.group(1) ?? '',

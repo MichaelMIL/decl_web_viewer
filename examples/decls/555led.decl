@@ -1,0 +1,72 @@
+component NE555DR {
+  pins {
+    1: PowerInput as GND
+    2: Bidirectional as TRIG
+    3: Output as OUT
+    4: PowerInput as RESET
+    5: Analog as CTRL
+    6: Bidirectional as THRS
+    7: Bidirectional as DISCH
+    8: PowerInput as VCC
+  }
+}
+
+component Resistor {
+  pins {
+    pin1: Passive
+    pin2: Passive
+  }
+  attributes {
+    resistance: Resistance
+  }
+}
+
+component Capacitor {
+  pins {
+    pin1: Passive
+    pin2: Passive
+  }
+  attributes {
+    capacitance: Capacitance
+  }
+}
+
+component LED {
+  pins {
+    Anode: Passive
+    Cathode: Passive
+  }
+}
+
+schematic Basic555TimerLED {
+  instance U1: NE555DR
+  instance R1: Resistor { resistance = 47kohm }
+  instance R2: Resistor { resistance = 470kohm }
+  instance R3: Resistor { resistance = 220ohm }
+  instance C1: Capacitor { capacitance = 10uF }
+  instance C2: Capacitor { capacitance = 0.01uF }
+  instance LED1: LED
+
+  net VCC
+  net GND
+  net LED_output
+
+  connect U1.8 as VCC -- net VCC
+  connect U1.1 as GND -- net GND
+  connect U1.4 as RESET -- net VCC
+  connect U1.5 as CTRL -- net GND
+  connect C2.pin1 as GND -- net GND
+  connect C2.pin2 as CTRL -- U1.5
+  connect R1.pin1 as pin1 -- U1.7
+  connect R1.pin2 as pin2 -- U1.8
+  connect R2.pin1 as pin1 -- U1.6
+  connect R2.pin1 as pin1_alt -- U1.2
+  connect R2.pin2 as pin2 -- R1.pin1
+  connect C1.pin1 as pin1 -- R2.pin2
+  connect C1.pin2 as GND -- net GND
+  connect U1.6 as THRS -- U1.2
+  connect U1.3 as OUT -- net LED_output
+  connect LED1.Anode as Anode -- net LED_output
+  connect R3.pin1 as pin1 -- LED1.Cathode
+  connect R3.pin2 as pin2 -- net GND
+}
