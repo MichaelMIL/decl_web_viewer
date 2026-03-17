@@ -176,7 +176,8 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final compCount = _components.length;
+    final uniqueCompCount = _components.length;
+    final instanceCount = _instances.length;
     final netCount = _nets.length;
     final headerSubtitle = _fileName ?? 'no file selected';
     final headerTitle = _fileName != null
@@ -255,7 +256,7 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
                                   child: _Panel(
                                     title: 'Topology',
                                     pillText:
-                                        '$compCount components · $netCount nets',
+                                        '$instanceCount components · $uniqueCompCount unique · $netCount nets',
                                     child: Row(
                                       children: [
                                         Expanded(
