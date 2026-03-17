@@ -348,35 +348,30 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          SizedBox(
-                            height: 720,
-                            child: _GlassCard(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const _CardHeader(
-                                    chipLabel: 'DECL Viewer',
-                                    title: 'Schematic view',
-                                    subtitle: 'instance pins & nets',
-                                    showReload: false,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Expanded(
-                                    child: _Panel(
-                                      title: 'Detailed schematic',
-                                      pillText: 'Auto‑layout from DECL',
-                                      child: _CodePanel(
-                                        header: 'Instances with pin nets',
-                                        child: _DetailedSchematic(
-                                          components: _components,
-                                          instances: _instances,
-                                          connections: _connections,
-                                        ),
-                                      ),
+                          _GlassCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _CardHeader(
+                                  chipLabel: 'DECL Viewer',
+                                  title: 'Schematic view',
+                                  subtitle: 'instance pins & nets',
+                                  showReload: false,
+                                ),
+                                const SizedBox(height: 8),
+                                _Panel(
+                                  title: 'Detailed schematic',
+                                  pillText: 'Auto‑layout from DECL',
+                                  child: _CodePanel(
+                                    header: 'Instances with pin nets',
+                                    child: _DetailedSchematic(
+                                      components: _components,
+                                      instances: _instances,
+                                      connections: _connections,
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -1247,8 +1242,13 @@ class _DetailedSchematicState extends State<_DetailedSchematic> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        const canvasHeight = 560.0;
-        final size = Size(constraints.maxWidth, canvasHeight);
+        const baseCanvasHeight = 560.0;
+        const extraPerRow = 80.0;
+        final rows = (widget.instances.length <= 1)
+            ? 1
+            : (1 + (widget.instances.length - 1) / 3).floor();
+        final dynamicHeight = baseCanvasHeight + (rows - 1) * extraPerRow;
+        final size = Size(constraints.maxWidth, dynamicHeight);
         final layout = _computeLayout(size, compByName);
 
         String? hitTest(Offset pos) {
