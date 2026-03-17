@@ -1,0 +1,126 @@
+component ESP32_WROOM_32 {
+  pins {
+    1: PowerInput as GND_1
+    2: PowerInput as VCC_3V3
+    3: Unconnected as NC1
+    4: Input as EN
+    5: Bidirectional as GPIO36
+    6: Bidirectional as GPIO39
+    7: Bidirectional as GPIO34
+    8: Bidirectional as GPIO35
+    9: Bidirectional as GPIO32
+    10: Bidirectional as GPIO33
+    11: Bidirectional as GPIO25
+    12: Bidirectional as GPIO26
+    13: Bidirectional as GPIO27
+    14: Bidirectional as GPIO14
+    15: Bidirectional as GPIO12
+    16: PowerInput as GND_2
+    17: Bidirectional as GPIO13
+    18: Bidirectional as GPIO9
+    19: Bidirectional as GPIO10
+    20: Bidirectional as GPIO11
+    21: Bidirectional as GPIO6
+    22: Bidirectional as GPIO7
+    23: Bidirectional as GPIO8
+    24: Bidirectional as GPIO15
+    25: Bidirectional as GPIO2
+    26: Bidirectional as GPIO0
+    27: Bidirectional as GPIO4
+    28: Bidirectional as GPIO16
+    29: Bidirectional as GPIO17
+    30: Bidirectional as GPIO5
+    31: Bidirectional as GPIO18
+    32: Bidirectional as GPIO19
+    33: Unconnected as NC2
+    34: Bidirectional as GPIO21
+    35: Bidirectional as GPIO3
+    36: Bidirectional as GPIO1
+    37: Bidirectional as GPIO22
+    38: Bidirectional as GPIO23
+    39: PowerInput as GND_3
+  }
+}
+
+component LED {
+  pins {
+    A: Analog as anode
+    K: Analog as cathode
+  }
+  attributes {
+    forward_voltage: Voltage = 2.0V
+    color: Color = red
+  }
+}
+
+component Resistor {
+  pins {
+    1: Passive as p1
+    2: Passive as p2
+  }
+  attributes {
+    resistance: Resistance = 10kohm
+  }
+}
+
+component Capacitor {
+  pins {
+    1: Passive as p1
+    2: Passive as p2
+  }
+  attributes {
+    capacitance: Capacitance = 100nF
+  }
+}
+
+component PushButton {
+  pins {
+    1: Passive as p1
+    2: Passive as p2
+  }
+}
+
+schematic ESP32_LED_Blink {
+  instance U1: ESP32_WROOM_32
+  instance LED1: LED { forward_voltage = 2.0V }
+  instance R1: Resistor { resistance = 10kohm }
+  instance R2: Resistor { resistance = 330ohm }
+  instance C1: Capacitor { capacitance = 100nF }
+  instance C2: Capacitor { capacitance = 100nF }
+  instance C3: Capacitor { capacitance = 15uF }
+  instance SW1: PushButton
+
+  net NET_3V3
+  net NET_GND
+  net NET_EN
+  net NET_GPIO2
+  net NET_LED_ANODE
+
+  connect U1.VCC_3V3 -- net NET_3V3
+  connect U1.GND_1 -- net NET_GND
+  connect U1.GND_2 -- net NET_GND
+  connect U1.GND_3 -- net NET_GND
+  connect U1.EN -- net NET_EN
+  connect U1.GPIO2 -- net NET_GPIO2
+
+  connect R1.p1 -- net NET_3V3
+  connect R1.p2 -- net NET_EN
+
+  connect SW1.p1 -- net NET_EN
+  connect SW1.p2 -- net NET_GND
+
+  connect R2.p1 -- net NET_GPIO2
+  connect R2.p2 -- net NET_LED_ANODE
+
+  connect LED1.anode -- net NET_LED_ANODE
+  connect LED1.cathode -- net NET_GND
+
+  connect C1.p1 -- net NET_3V3
+  connect C1.p2 -- net NET_GND
+
+  connect C2.p1 -- net NET_3V3
+  connect C2.p2 -- net NET_GND
+
+  connect C3.p1 -- net NET_3V3
+  connect C3.p2 -- net NET_GND
+}

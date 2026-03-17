@@ -1,0 +1,1273 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DECL Viewer - ESP32 LED Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0b1020;
+        --bg-alt: #151a2a;
+        --bg-panel: #181e30;
+        --border-subtle: #252b3d;
+        --accent: #4f8cff;
+        --accent-soft: rgba(79, 140, 255, 0.12);
+        --accent-strong: rgba(79, 140, 255, 0.35);
+        --text: #f8fafc;
+        --text-muted: #9ca3af;
+        --danger: #f97373;
+        --mono: "SF Mono", ui-monospace, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+        --radius-lg: 14px;
+        --radius-md: 9px;
+        --radius-pill: 999px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+          sans-serif;
+        background: radial-gradient(circle at top, #101632, #050714 55%);
+        color: var(--text);
+        display: flex;
+        justify-content: center;
+        align-items: stretch;
+        padding: 20px;
+      }
+
+      .app-shell {
+        width: 100%;
+        max-width: 1120px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .card {
+        background: linear-gradient(145deg, #111628, #070a16);
+        border-radius: 24px;
+        padding: 18px 18px 16px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        box-shadow:
+          0 28px 80px rgba(15, 23, 42, 0.9),
+          0 0 0 1px rgba(15, 23, 42, 0.7) inset;
+        backdrop-filter: blur(18px);
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .title-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .chip {
+        font-size: 11px;
+        padding: 3px 10px;
+        border-radius: var(--radius-pill);
+        border: 1px solid rgba(148, 163, 184, 0.32);
+        color: var(--text-muted);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: radial-gradient(circle at top left, #1d253e, #050714);
+      }
+
+      .chip-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: #22c55e;
+        box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.16);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 19px;
+        letter-spacing: 0.03em;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      h1 span.sub {
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        letter-spacing: 0.16em;
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      button {
+        border: none;
+        cursor: pointer;
+        font-size: 12px;
+        border-radius: var(--radius-pill);
+        padding: 7px 12px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(15, 23, 42, 0.9);
+        color: var(--text-muted);
+        border: 1px solid rgba(148, 163, 184, 0.28);
+      }
+
+      button.primary {
+        background: radial-gradient(circle at top left, #4f8cff, #2563eb);
+        color: white;
+        border: none;
+        box-shadow:
+          0 12px 30px rgba(37, 99, 235, 0.45),
+          0 0 0 1px rgba(59, 130, 246, 0.4);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 1.1fr 1.3fr;
+        gap: 14px;
+        align-items: stretch;
+      }
+
+      @media (max-width: 900px) {
+        body {
+          padding: 10px;
+        }
+        .card {
+          padding: 14px 12px;
+        }
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .panel {
+        background: radial-gradient(circle at top, #171c30, #050814);
+        border-radius: var(--radius-lg);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        padding: 10px 10px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+      }
+
+      .panel-title {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--text-muted);
+      }
+
+      .pill {
+        font-size: 11px;
+        padding: 3px 9px;
+        border-radius: var(--radius-pill);
+        background: rgba(15, 23, 42, 0.85);
+        color: var(--text-muted);
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .pill-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: #4f8cff;
+      }
+
+      .panel-body {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        gap: 10px;
+        font-size: 12px;
+      }
+
+      .list {
+        flex: 1;
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: radial-gradient(circle at top, #171d33, #050814);
+        padding: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 260px;
+        overflow: hidden auto;
+      }
+
+      .list-title {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-muted);
+        margin-bottom: 2px;
+        padding: 0 2px;
+      }
+
+      .list-item {
+        border-radius: 10px;
+        padding: 6px 7px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 6px;
+        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.24);
+      }
+
+      .list-item.main {
+        border-color: rgba(74, 222, 128, 0.6);
+        box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.3);
+      }
+
+      .list-label {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+
+      .list-label span.name {
+        font-weight: 500;
+        font-size: 12px;
+      }
+
+      .list-label span.meta {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .badge {
+        font-size: 10px;
+        padding: 2px 7px;
+        border-radius: var(--radius-pill);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: rgba(15, 23, 42, 0.85);
+        color: var(--text-muted);
+        white-space: nowrap;
+      }
+
+      .badge.net {
+        border-color: rgba(56, 189, 248, 0.6);
+        color: #7dd3fc;
+        background: rgba(15, 23, 42, 0.9);
+      }
+
+      .badge.io {
+        border-color: rgba(129, 140, 248, 0.8);
+        color: #a5b4fc;
+      }
+
+      .badge.power {
+        border-color: rgba(52, 211, 153, 0.8);
+        color: #6ee7b7;
+      }
+
+      .badge.passive {
+        border-color: rgba(249, 115, 22, 0.8);
+        color: #fed7aa;
+      }
+
+      .badge.analog {
+        border-color: rgba(244, 63, 94, 0.8);
+        color: #fecaca;
+      }
+
+      .code-panel {
+        flex: 1;
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: radial-gradient(circle at top, #0b1020, #020412);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .code-header {
+        padding: 4px 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.9);
+        background: radial-gradient(circle at top, #050816, #020412);
+      }
+
+      .code-header span {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .code-scroll {
+        flex: 1;
+        overflow: auto;
+        padding: 6px 8px 8px;
+      }
+
+      pre {
+        margin: 0;
+        font-family: var(--mono);
+        font-size: 11px;
+        line-height: 1.5;
+        color: #e5e7eb;
+      }
+
+      .kw {
+        color: #38bdf8;
+      }
+
+      .ident {
+        color: #e5e7eb;
+      }
+
+      .num {
+        color: #facc15;
+      }
+
+      .type {
+        color: #a5b4fc;
+      }
+
+      .attr {
+        color: #f97373;
+      }
+
+      .status {
+        font-size: 11px;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: -4px;
+      }
+
+      .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: #4ade80;
+        box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.22);
+      }
+
+      .status.error .status-dot {
+        background: var(--danger);
+        box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.22);
+      }
+
+      .status.error span {
+        color: var(--danger);
+      }
+
+      .schematic-grid {
+        background-image: linear-gradient(
+            to right,
+            rgba(148, 163, 184, 0.07) 1px,
+            transparent 1px
+          ),
+          linear-gradient(
+            to bottom,
+            rgba(148, 163, 184, 0.07) 1px,
+            transparent 1px
+          );
+        background-size: 16px 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <div class="card">
+        <div class="card-header">
+          <div class="title-row">
+            <div class="chip">
+              <span class="chip-dot"></span>
+              <span>DECL Schematic Viewer</span>
+            </div>
+            <div>
+              <h1>
+                ESP32 LED Test
+                <span class="sub">esp32-led-test.decl</span>
+              </h1>
+            </div>
+          </div>
+          <div class="actions">
+            <button id="reload-btn" class="primary">
+              ⟳ Reload from file
+            </button>
+          </div>
+        </div>
+        <div id="status" class="status">
+          <div class="status-dot"></div>
+          <span>Waiting for data…</span>
+        </div>
+        <div class="layout">
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Topology</span>
+              <span class="pill">
+                <span class="pill-dot"></span>
+                <span id="summary-pill">0 components · 0 nets</span>
+              </span>
+            </div>
+            <div class="panel-body">
+              <div class="list">
+                <div class="list-title">Components</div>
+                <div id="components-list"></div>
+              </div>
+              <div class="list">
+                <div class="list-title">Nets</div>
+                <div id="nets-list"></div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Schematic</span>
+              <span class="pill">
+                <span class="pill-dot"></span>
+                Instances & nets
+              </span>
+            </div>
+            <div class="code-panel schematic-grid">
+              <div class="code-header">
+                <span>Topology diagram</span>
+              </div>
+              <div class="code-scroll">
+                <svg
+                  id="schematic-svg"
+                  width="100%"
+                  height="260"
+                  viewBox="0 0 600 260"
+                  preserveAspectRatio="xMidYMid meet"
+                ></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="title-row">
+            <div class="chip">
+              <span class="chip-dot"></span>
+              <span>DECL Viewer</span>
+            </div>
+            <div>
+              <h1>
+                Schematic view
+                <span class="sub">instance pins & nets</span>
+              </h1>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Detailed schematic</span>
+            <span class="pill">
+              <span class="pill-dot"></span>
+              Auto‑layout from DECL
+            </span>
+          </div>
+          <div class="code-panel schematic-grid">
+            <div class="code-header">
+              <span>Instances with pin nets</span>
+            </div>
+            <div class="code-scroll">
+              <svg
+                id="schematic-svg-detailed"
+                width="100%"
+                height="260"
+                viewBox="0 0 800 260"
+                preserveAspectRatio="xMidYMid meet"
+              ></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const statusEl = document.getElementById("status");
+      const summaryPill = document.getElementById("summary-pill");
+      const componentsList = document.getElementById("components-list");
+      const netsList = document.getElementById("nets-list");
+      const svgEl = document.getElementById("schematic-svg");
+      const svgDetailedEl = document.getElementById("schematic-svg-detailed");
+      const reloadBtn = document.getElementById("reload-btn");
+
+      let detailedInstanceLayout = null;
+      let lastFirstSch = null;
+      let lastCompByName = null;
+      let dragState = null;
+
+      function setStatus(message, isError = false) {
+        statusEl.classList.toggle("error", isError);
+        const span = statusEl.querySelector("span");
+        span.textContent = message;
+      }
+
+      function escapeHtml(str) {
+        return str
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      function highlightDecl(src) {
+        const escaped = escapeHtml(src);
+        return escaped
+          .replace(
+            /\b(component|schematic|pins|attributes|instance|net|connect|as)\b/g,
+            '<span class="kw">$1</span>'
+          )
+          .replace(/\b(GPIO\d+|GND_\d+|VCC_3V3|NET_\w+)\b/g, '<span class="ident">$1</span>')
+          .replace(/\b(\d+(?:\.\d+)?(?:[a-zA-Z]+|V|ohm|uF|nF)?)\b/g, '<span class="num">$1</span>')
+          .replace(/\b(Analog|Passive|PowerInput|Bidirectional|Unconnected|Voltage|Color|Resistance|Capacitance)\b/g, '<span class="type">$1</span>')
+          .replace(/\b(forward_voltage|color|resistance|capacitance)\b/g, '<span class="attr">$1</span>');
+      }
+
+      function badgeClassForPinType(type) {
+        switch (type) {
+          case "PowerInput":
+            return "badge power";
+          case "Analog":
+            return "badge analog";
+          case "Passive":
+            return "badge passive";
+          case "Bidirectional":
+          case "Input":
+          case "Output":
+            return "badge io";
+          default:
+            return "badge";
+        }
+      }
+
+      function renderDiagram(firstSch) {
+        if (!firstSch) {
+          svgEl.innerHTML = "";
+          return;
+        }
+
+        const instances = firstSch.instances || [];
+        const nets = firstSch.nets || [];
+        const connections = firstSch.connections || [];
+
+        const width = 600;
+        const height = 260;
+        const marginX = 70;
+        const topMargin = 30;
+        const bottomMargin = 40;
+        const usableHeight = height - topMargin - bottomMargin;
+
+        const svgParts = [];
+        svgParts.push(
+          '<rect x="0" y="0" width="' +
+            width +
+            '" height="' +
+            height +
+            '" rx="10" ry="10" fill="rgba(15,23,42,0.95)" stroke="rgba(148,163,184,0.5)"/>'
+        );
+
+        const instancePositions = {};
+        instances.forEach(function (inst, idx) {
+          var x = marginX;
+          var y = topMargin + (usableHeight / Math.max(1, instances.length - 1)) * idx;
+          instancePositions[inst.name] = { x: x, y: y };
+        });
+
+        const netPositions = {};
+        nets.forEach(function (net, idx) {
+          var x = width - marginX;
+          var y = topMargin + (usableHeight / Math.max(1, nets.length - 1)) * idx;
+          netPositions[net.name] = { x: x, y: y };
+        });
+
+        Object.keys(instancePositions).forEach(function (name) {
+          const pos = instancePositions[name];
+          const w = 120;
+          const h = 30;
+          svgParts.push(
+            '<rect x="' +
+              (pos.x - w / 2) +
+              '" y="' +
+              (pos.y - h / 2) +
+              '" width="' +
+              w +
+              '" height="' +
+              h +
+              '" rx="6" ry="6" fill="rgba(30,64,175,0.75)" stroke="rgba(129,140,248,0.9)" />'
+          );
+          svgParts.push(
+            '<text x="' +
+              pos.x +
+              '" y="' +
+              pos.y +
+              '" text-anchor="middle" dominant-baseline="middle" fill="#e5e7eb" font-size="11" font-family="system-ui,sans-serif">' +
+              name +
+              "</text>"
+          );
+        });
+
+        Object.keys(netPositions).forEach(function (name) {
+          const pos = netPositions[name];
+          const r = 10;
+          svgParts.push(
+            '<circle cx="' +
+              pos.x +
+              '" cy="' +
+              pos.y +
+              '" r="' +
+              r +
+              '" fill="rgba(22,163,74,0.85)" stroke="rgba(74,222,128,0.95)" />'
+          );
+          svgParts.push(
+            '<text x="' +
+              (pos.x + r + 6) +
+              '" y="' +
+              pos.y +
+              '" text-anchor="start" dominant-baseline="middle" fill="#bbf7d0" font-size="10" font-family="system-ui,sans-serif">' +
+              name +
+              "</text>"
+          );
+        });
+
+        const netColors = {};
+        const palette = [
+          "#4f46e5",
+          "#22c55e",
+          "#eab308",
+          "#fb7185",
+          "#0ea5e9",
+          "#a855f7",
+          "#f97316"
+        ];
+
+        Object.keys(netPositions).forEach(function (name, idx) {
+          netColors[name] = palette[idx % palette.length];
+        });
+
+        connections.forEach(function (conn, idx) {
+          var parts = conn.endpoint.split(".");
+          if (parts.length !== 2) {
+            return;
+          }
+          var instName = parts[0];
+          var instPos = instancePositions[instName];
+          var netPos = netPositions[conn.net];
+          if (!instPos || !netPos) {
+            return;
+          }
+          var startX = instPos.x + 60;
+          var startY = instPos.y;
+          var endX = netPos.x - 14;
+          var endY = netPos.y;
+          var midX = (startX + endX) / 2;
+
+          var strokeColor = netColors[conn.net] || "rgba(148,163,184,0.85)";
+
+          svgParts.push(
+            '<path d="M' +
+              startX +
+              " " +
+              startY +
+              " C " +
+              midX +
+              " " +
+              startY +
+              ", " +
+              midX +
+              " " +
+              endY +
+              ", " +
+              endX +
+              " " +
+              endY +
+              '" stroke="' +
+              strokeColor +
+              '" stroke-width="1.6" fill="none" stroke-linecap="round" />'
+          );
+        });
+
+        svgEl.setAttribute("viewBox", "0 0 " + width + " " + height);
+        svgEl.innerHTML = svgParts.join("");
+      }
+
+      function renderDetailedDiagram(firstSch, compByName) {
+        if (!firstSch) {
+          svgDetailedEl.innerHTML = "";
+          return;
+        }
+
+        const instances = firstSch.instances || [];
+        const connections = firstSch.connections || [];
+
+        if (!instances.length) {
+          svgDetailedEl.innerHTML = "";
+          return;
+        }
+
+        const root = instances[0];
+        const rootComp = compByName[root.component] || { pins: [] };
+        const rootPins = rootComp.pins || [];
+        const rootPinOrder = {};
+        rootPins.forEach(function (p, idx) {
+          rootPinOrder[p.name] = idx;
+        });
+
+        const instOrderScore = {};
+        instances.forEach(function (inst, idx) {
+          if (idx === 0) {
+            instOrderScore[inst.name] = -1;
+            return;
+          }
+          let best = Number.MAX_SAFE_INTEGER;
+          connections.forEach(function (conn) {
+            const parts = conn.endpoint.split(".");
+            if (parts.length !== 2) return;
+            const instName = parts[0];
+            const pinName = parts[1];
+            if (instName !== inst.name) return;
+
+            connections.forEach(function (other) {
+              const op = other.endpoint.split(".");
+              if (op.length !== 2) return;
+              if (other.net !== conn.net) return;
+              if (op[0] !== root.name) return;
+              const rootPinName = op[1];
+              if (typeof rootPinOrder[rootPinName] === "number") {
+                if (rootPinOrder[rootPinName] < best) {
+                  best = rootPinOrder[rootPinName];
+                }
+              }
+            });
+          });
+          instOrderScore[inst.name] =
+            best === Number.MAX_SAFE_INTEGER ? 9999 + idx : best;
+        });
+
+        const instancesOrdered = instances
+          .slice()
+          .sort(function (a, b) {
+            return instOrderScore[a.name] - instOrderScore[b.name];
+          });
+
+        const width = 1200;
+        let height = 260;
+        const marginX = 180;
+        const topMargin = 50;
+        const bottomMargin = 80;
+        const gapBetweenInstances = 40;
+
+        const instanceLayout = detailedInstanceLayout || {};
+        let leftY = topMargin;
+        let rightY = topMargin;
+
+        instancesOrdered.forEach(function (inst, idx) {
+          const compDef = compByName[inst.component] || { pins: [] };
+          const pins = compDef.pins || [];
+          const w = 150;
+          const h = Math.max(46, 20 + pins.length * 12);
+          const existing = instanceLayout[inst.name];
+
+          const isRoot = idx === 0; // keep first (e.g. U1) as root on the left
+          let defaultX;
+          let defaultY;
+
+          if (isRoot) {
+            defaultX = marginX;
+            defaultY = leftY + h / 2;
+            leftY += h + gapBetweenInstances;
+          } else {
+            // Spread remaining instances over multiple rows and columns
+            const localIndex = idx - 1;
+            const cols = 3;
+            const col = localIndex % cols;
+            const row = Math.floor(localIndex / cols);
+            const colSpacing = 260;
+            const rowSpacing = 140;
+
+            defaultX = marginX + 260 + col * colSpacing;
+            defaultY = topMargin + row * rowSpacing + h / 2;
+            rightY = Math.max(rightY, defaultY + h / 2 + gapBetweenInstances);
+          }
+
+          const layout = {
+            x: existing ? existing.x : defaultX,
+            y: existing ? existing.y : defaultY,
+            w: w,
+            h: h,
+            pins: pins,
+            side: existing ? existing.side : isRoot ? "right" : "left"
+          };
+
+          instanceLayout[inst.name] = layout;
+        });
+
+        // When instances have been dragged, base height on actual layout
+        // extents rather than the initial auto-layout accumulators.
+        let minY = Infinity;
+        let maxY = -Infinity;
+        Object.keys(instanceLayout).forEach(function (name) {
+          const l = instanceLayout[name];
+          if (!l) return;
+          const top = l.y - l.h / 2;
+          const bottom = l.y + l.h / 2;
+          if (top < minY) minY = top;
+          if (bottom > maxY) maxY = bottom;
+        });
+        if (!isFinite(minY) || !isFinite(maxY)) {
+          minY = topMargin;
+          maxY = Math.max(leftY, rightY);
+        }
+
+        height = Math.max(260, maxY + bottomMargin);
+
+        detailedInstanceLayout = instanceLayout;
+
+        const svgParts = [];
+        svgParts.push(
+          '<rect x="0" y="0" width="' +
+            width +
+            '" height="' +
+            height +
+            '" rx="10" ry="10" fill="rgba(15,23,42,0.96)" stroke="rgba(148,163,184,0.5)"/>'
+        );
+
+        instancesOrdered.forEach(function (inst) {
+          const layout = instanceLayout[inst.name];
+          const pins = layout.pins;
+          const w = layout.w;
+          const h = layout.h;
+          const x = layout.x;
+          const y = layout.y;
+
+          const compDef = compByName[inst.component] || { attributes: {} };
+          const instAttrs = inst.attributes || {};
+          let valueText = "";
+          if (inst.component === "Resistor") {
+            valueText =
+              instAttrs.resistance ||
+              (compDef.attributes.resistance &&
+                compDef.attributes.resistance.value) ||
+              "";
+          } else if (inst.component === "Capacitor") {
+            valueText =
+              instAttrs.capacitance ||
+              (compDef.attributes.capacitance &&
+                compDef.attributes.capacitance.value) ||
+              "";
+          } else if (inst.component === "LED") {
+            valueText =
+              instAttrs.color ||
+              (compDef.attributes.color && compDef.attributes.color.value) ||
+              "";
+          }
+
+          svgParts.push(
+            '<rect x="' +
+              (x - w / 2) +
+              '" y="' +
+              (y - h / 2) +
+              '" width="' +
+              w +
+              '" height="' +
+              h +
+              '" rx="6" ry="6" fill="rgba(15,23,42,0.95)" stroke="rgba(148,163,184,0.9)" />'
+          );
+
+          svgParts.push(
+            '<text x="' +
+              x +
+              '" y="' +
+              (y - h / 2 + 14) +
+              '" text-anchor="middle" fill="#e5e7eb" font-size="11" font-family="system-ui,sans-serif">' +
+              inst.name +
+              " : " +
+              inst.component +
+              "</text>"
+          );
+
+          if (valueText) {
+            svgParts.push(
+              '<text x="' +
+                x +
+                '" y="' +
+                (y - h / 2 + 28) +
+                '" text-anchor="middle" fill="#a5b4fc" font-size="10" font-family="system-ui,sans-serif">' +
+                valueText +
+                "</text>"
+            );
+          }
+
+          pins.forEach(function (pin, index) {
+            var pinY = y - h / 2 + 24 + index * 12;
+            var pinX =
+              layout.side === "right" ? x + w / 2 : x - w / 2;
+            svgParts.push(
+              '<circle cx="' +
+                (layout.side === "right" ? pinX + 6 : pinX - 6) +
+                '" cy="' +
+                pinY +
+                '" r="3" fill="rgba(148,163,184,0.9)" />'
+            );
+            svgParts.push(
+              '<text x="' +
+                (layout.side === "right" ? pinX - 4 : pinX + 4) +
+                '" y="' +
+                pinY +
+                '" text-anchor="' +
+                (layout.side === "right" ? "end" : "start") +
+                '" dominant-baseline="middle" fill="#9ca3af" font-size="10" font-family="system-ui,sans-serif">' +
+                pin.name +
+                "</text>"
+            );
+          });
+        });
+
+        const netToPins = {};
+        connections.forEach(function (conn) {
+          var parts = conn.endpoint.split(".");
+          if (parts.length !== 2) {
+            return;
+          }
+          var instName = parts[0];
+          var pinName = parts[1];
+          var layout = instanceLayout[instName];
+          if (!layout) {
+            return;
+          }
+          var pins = layout.pins || [];
+          var pinIndex = pins.findIndex(function (p) {
+            return p.name === pinName;
+          });
+          if (pinIndex === -1) {
+            return;
+          }
+          var w = layout.w;
+          var h = layout.h;
+          var instPos = { x: layout.x, y: layout.y };
+
+          var pinY = instPos.y - h / 2 + 24 + pinIndex * 12;
+          var pinEdgeX =
+            layout.side === "right"
+              ? instPos.x + w / 2
+              : instPos.x - w / 2;
+          // Route from the pad at the edge of the symbol, not the dot,
+          // so vertical bus lines stay clear of the pin column.
+          var routeX = pinEdgeX;
+
+          var isLeftColumn = layout.side === "left";
+          var outerX = isLeftColumn ? routeX - 40 : routeX + 40;
+
+          if (!netToPins[conn.net]) {
+            netToPins[conn.net] = [];
+          }
+          netToPins[conn.net].push({
+            x: routeX,
+            y: pinY,
+            outerX: outerX,
+            instName: instName,
+            pinName: pinName,
+            isLeft: isLeftColumn
+          });
+        });
+
+        const netPalette = [
+          "#4f46e5",
+          "#22c55e",
+          "#eab308",
+          "#fb7185",
+          "#0ea5e9",
+          "#a855f7",
+          "#f97316"
+        ];
+
+        Object.keys(netToPins).forEach(function (netName, idx) {
+          const pins = netToPins[netName];
+          if (!pins || pins.length < 2) {
+            return;
+          }
+          const color = netPalette[idx % netPalette.length];
+
+          const avgY =
+            pins.reduce(function (sum, p) {
+              return sum + p.y;
+            }, 0) / pins.length;
+
+          // Keep each bus near its connected pins, but nudge slightly
+          // by index so parallel buses don't perfectly overlap.
+          const offset = (idx % 5) * 6 - 12; // spread in [-12, +12]
+          const busY = avgY + offset;
+
+          const adjustedPins = pins.map(function (p, i) {
+            const spread = 8;
+            const offset = (i - (pins.length - 1) / 2) * spread;
+            const adjustedOuterX = p.outerX + (p.isLeft ? -offset : offset);
+            return {
+              x: p.x,
+              y: p.y,
+              outerX: adjustedOuterX
+            };
+          });
+
+          const minOuterX = Math.min.apply(
+            null,
+            adjustedPins.map(function (p) {
+              return p.outerX;
+            })
+          );
+          const maxOuterX = Math.max.apply(
+            null,
+            adjustedPins.map(function (p) {
+              return p.outerX;
+            })
+          );
+
+          adjustedPins.forEach(function (p) {
+            svgParts.push(
+              '<path d="M' +
+                p.x +
+                " " +
+                p.y +
+                " H " +
+                p.outerX +
+                " V " +
+                busY +
+                '" stroke="' +
+                color +
+                '" stroke-width="1.2" fill="none" stroke-linecap="round" />'
+            );
+          });
+
+          svgParts.push(
+            '<line x1="' +
+              minOuterX +
+              '" y1="' +
+              busY +
+              '" x2="' +
+              maxOuterX +
+              '" y2="' +
+              busY +
+              '" stroke="' +
+              color +
+              '" stroke-width="1.2" stroke-linecap="round" />'
+          );
+
+          svgParts.push(
+            '<text x="' +
+              (maxOuterX + 6) +
+              '" y="' +
+              (busY - 4) +
+              '" text-anchor="start" fill="' +
+              color +
+              '" font-size="10" font-family="system-ui,sans-serif">' +
+              netName +
+              "</text>"
+          );
+        });
+
+        svgDetailedEl.setAttribute("viewBox", "0 0 " + width + " " + height);
+        svgDetailedEl.setAttribute("height", String(height));
+        svgDetailedEl.innerHTML = svgParts.join("");
+      }
+
+      function render(parsed) {
+        const components = parsed.components || [];
+        const schematics = parsed.schematics || [];
+        const firstSch = schematics[0] || { nets: [], connections: [], instances: [] };
+
+        summaryPill.textContent =
+          components.length + " components · " + firstSch.nets.length + " nets";
+
+        const compByName = {};
+        components.forEach(function (c) {
+          compByName[c.name] = c;
+        });
+
+        lastFirstSch = firstSch;
+        lastCompByName = compByName;
+
+        componentsList.innerHTML = "";
+        netsList.innerHTML = "";
+
+        renderDiagram(firstSch);
+        renderDetailedDiagram(firstSch, compByName);
+
+        (firstSch.instances || []).forEach((inst, idx) => {
+          const compDef = compByName[inst.component] || { pins: [], attributes: {} };
+          const div = document.createElement("div");
+          div.className = "list-item" + (idx === 0 ? " main" : "");
+          const left = document.createElement("div");
+          left.className = "list-label";
+          const attrCount = Object.keys(compDef.attributes || {}).length;
+          const meta =
+            compDef.pins.length +
+            " pins · " +
+            inst.component +
+            (attrCount ? " · " + attrCount + " attrs" : "");
+          left.innerHTML =
+            '<span class="name">' +
+            inst.name +
+            "</span>" +
+            '<span class="meta">' +
+            meta +
+            "</span>";
+
+          const right = document.createElement("div");
+          right.style.display = "flex";
+          right.style.gap = "4px";
+
+          const pinTypes = Array.from(
+            new Set((compDef.pins || []).map(function (p) {
+              return p.type;
+            }))
+          ).slice(0, 2);
+          pinTypes.forEach((t) => {
+            const span = document.createElement("span");
+            span.className = badgeClassForPinType(t);
+            span.textContent = t;
+            right.appendChild(span);
+          });
+
+          div.appendChild(left);
+          div.appendChild(right);
+          componentsList.appendChild(div);
+        });
+
+        firstSch.nets.forEach((net) => {
+          const div = document.createElement("div");
+          div.className = "list-item";
+          const left = document.createElement("div");
+          left.className = "list-label";
+
+          const connected = (firstSch.connections || []).filter(
+            (c) => c.net === net.name
+          );
+
+          left.innerHTML =
+            '<span class="name">' +
+            net.name +
+            "</span>" +
+            '<span class="meta">' +
+            connected.length +
+            " connections</span>";
+
+          const right = document.createElement("div");
+          right.style.display = "flex";
+          right.style.gap = "4px";
+
+          const span = document.createElement("span");
+          span.className = "badge net";
+          span.textContent = "NET";
+          right.appendChild(span);
+
+          div.appendChild(left);
+          div.appendChild(right);
+          netsList.appendChild(div);
+        });
+      }
+
+      async function loadDecl() {
+        setStatus("Loading from server…");
+        try {
+          const res = await fetch("/api/decl");
+          if (!res.ok) {
+            throw new Error("HTTP " + res.status);
+          }
+          const json = await res.json();
+          render(json.parsed);
+          const fileName = json.filePath
+            ? json.filePath.substring(json.filePath.lastIndexOf("/") + 1)
+            : "esp32-led-test.decl";
+          setStatus("Loaded from file: " + fileName);
+        } catch (err) {
+          console.error(err);
+          setStatus("Failed to load DECL file: " + err.message, true);
+        }
+      }
+
+      reloadBtn.addEventListener("click", loadDecl);
+
+      loadDecl();
+
+      function svgClientToViewBox(evt) {
+        const rect = svgDetailedEl.getBoundingClientRect();
+        const viewBox = svgDetailedEl.viewBox.baseVal;
+        const scaleX = viewBox.width / rect.width;
+        const scaleY = viewBox.height / rect.height;
+        return {
+          x: (evt.clientX - rect.left) * scaleX + viewBox.x,
+          y: (evt.clientY - rect.top) * scaleY + viewBox.y
+        };
+      }
+
+      svgDetailedEl.addEventListener("mousedown", function (evt) {
+        if (!lastFirstSch || !detailedInstanceLayout) return;
+        const p = svgClientToViewBox(evt);
+        let hitName = null;
+        Object.keys(detailedInstanceLayout).forEach(function (name) {
+          const l = detailedInstanceLayout[name];
+          const x0 = l.x - l.w / 2;
+          const y0 = l.y - l.h / 2;
+          if (p.x >= x0 && p.x <= x0 + l.w && p.y >= y0 && p.y <= y0 + l.h) {
+            hitName = name;
+          }
+        });
+        if (!hitName) return;
+        const layout = detailedInstanceLayout[hitName];
+        dragState = {
+          name: hitName,
+          offsetX: p.x - layout.x,
+          offsetY: p.y - layout.y
+        };
+      });
+
+      window.addEventListener("mousemove", function (evt) {
+        if (!dragState || !lastFirstSch || !lastCompByName) return;
+        const p = svgClientToViewBox(evt);
+        const layout = detailedInstanceLayout[dragState.name];
+        if (!layout) return;
+        layout.x = p.x - dragState.offsetX;
+        layout.y = p.y - dragState.offsetY;
+        renderDetailedDiagram(lastFirstSch, lastCompByName);
+      });
+
+      window.addEventListener("mouseup", function () {
+        dragState = null;
+      });
+    </script>
+  </body>
+</html>
+
