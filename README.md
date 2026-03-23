@@ -32,11 +32,18 @@ This will open the DECL viewer in Chrome.
 ### Using the Flutter viewer
 
 - Click the **“Browse DECL file”** button in the header.
+- If your DECL file uses `import <...>`, click **“Load DECL libs folder”** first and select your library root (typically `decl/stdlib`).
 - Choose any `.decl` file from your machine.
 - The UI will update to show:
   - **Topology**: components and nets from the file.
   - **Schematic view**: instance pins and net connections.
   - **PCB view**: a board-style visualization based on the same schematic.
+
+### Import resolution notes
+
+- Imports are resolved recursively from the loaded library folder.
+- Example: `import <components/resistor.decl>` resolves when `decl/stdlib` is loaded.
+- If an import is missing, the viewer shows a clear error in the status bar.
 
 The header title and subtitle update dynamically based on the selected file name.
 

@@ -51,6 +51,7 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
 
   String? _fileName;
   bool _dragActive = false;
+  Map<String, String> _declLibraryFiles = const {};
   List<DeclComponent> _components = const [];
   List<DeclNet> _nets = const [];
   List<DeclInstance> _instances = const [];
@@ -64,10 +65,13 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
     });
 
     final reader = html.FileReader();
-    reader.onLoadEnd.listen((_) {
+    reader.onLoadEnd.listen((_) async {
       try {
         final text = reader.result as String? ?? '';
-        final parsed = parseDeclText(text);
+        final parsed = await parseDeclText(
+          text,
+          libraryFiles: _declLibraryFiles,
+        );
 
         final componentsJson = parsed['components'] as List<dynamic>? ?? [];
         final schematicsJson = parsed['schematics'] as List<dynamic>? ?? [];
@@ -113,6 +117,74 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
     });
 
     reader.readAsText(file);
+  }
+
+  Future<String> _readBrowserFileAsText(html.File file) {
+    final completer = Completer<String>();
+    final reader = html.FileReader();
+    reader.onLoadEnd.listen((_) {
+      completer.complete(reader.result as String? ?? '');
+    });
+    reader.onError.listen((_) {
+      completer.completeError(StateError('Failed to read ${file.name}'));
+    });
+    reader.readAsText(file);
+    return completer.future;
+  }
+
+  Future<void> _loadDeclLibraries() async {
+    final input = html.FileUploadInputElement()
+      ..multiple = true
+      ..accept = '.decl';
+    input.setAttribute('webkitdirectory', '');
+    input.setAttribute('directory', '');
+
+    input.onChange.listen((_) async {
+      final files = input.files;
+      if (files == null || files.isEmpty) {
+        setState(() {
+          _statusError = false;
+          _statusMessage = 'Library folder selection cancelled.';
+        });
+        return;
+      }
+
+      setState(() {
+        _loading = true;
+        _statusError = false;
+        _statusMessage = 'Loading DECL libraries…';
+      });
+
+      try {
+        final map = <String, String>{};
+        for (final file in files) {
+          final relRaw = file.name;
+          final rel = relRaw.replaceAll('\\', '/');
+          if (!rel.toLowerCase().endsWith('.decl')) continue;
+          final content = await _readBrowserFileAsText(file);
+
+          _putLibraryPath(map, rel, content);
+          _putLibraryPath(map, _trimFirstPathSegment(rel), content);
+          _putLibraryPath(map, _normalizeAfterMarker(rel, 'decl/'), content);
+          _putLibraryPath(map, _normalizeAfterMarker(rel, 'stdlib/'), content);
+        }
+
+        setState(() {
+          _declLibraryFiles = map;
+          _loading = false;
+          _statusError = false;
+          _statusMessage = 'Loaded ${map.length} library DECL files.';
+        });
+      } catch (e) {
+        setState(() {
+          _loading = false;
+          _statusError = true;
+          _statusMessage = 'Failed to load DECL libraries: $e';
+        });
+      }
+    });
+
+    input.click();
   }
 
   Future<void> _loadDecl() async {
@@ -167,7 +239,7 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
         _dragActive = false;
       });
 
-      final files = event.dataTransfer?.files;
+      final files = event.dataTransfer.files;
       if (files != null && files.isNotEmpty) {
         _processFile(files[0]);
       }
@@ -197,6 +269,7 @@ class _DeclViewerPageState extends State<DeclViewerPage> {
                     title: headerTitle,
                     subtitle: headerSubtitle,
                     onReload: _loading ? null : _loadDecl,
+                    onLoadLibraries: _loading ? null : _loadDeclLibraries,
                     loading: _loading,
                   ),
                   const SizedBox(height: 8),
@@ -393,12 +466,14 @@ class _HeaderBar extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback? onReload;
+  final VoidCallback? onLoadLibraries;
   final bool loading;
 
   const _HeaderBar({
     required this.title,
     required this.subtitle,
     required this.onReload,
+    required this.onLoadLibraries,
     required this.loading,
   });
 
@@ -447,6 +522,20 @@ class _HeaderBar extends StatelessWidget {
               label: Text(
                 loading ? 'Loading…' : 'Browse DECL file',
                 style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          const SizedBox(width: 8),
+          if (onLoadLibraries != null)
+            OutlinedButton.icon(
+              onPressed: loading ? null : onLoadLibraries,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: const StadiumBorder(),
+              ),
+              icon: const Icon(Icons.folder_open, size: 16),
+              label: const Text(
+                'Load DECL libs folder',
+                style: TextStyle(fontSize: 12),
               ),
             ),
         ],
@@ -1707,8 +1796,46 @@ class _InstanceLayout {
   });
 }
 
-Map<String, dynamic> parseDeclText(String text) {
+Future<Map<String, dynamic>> parseDeclText(
+  String text, {
+  Map<String, String> libraryFiles = const {},
+  Set<String>? visitedImports,
+}) async {
+  final visited = visitedImports ?? <String>{};
   final lines = const LineSplitter().convert(text);
+
+  final importedComponents = <Map<String, dynamic>>[];
+  for (final rawLine in lines) {
+    final line = rawLine.trim();
+    final importMatch = RegExp(r'^import\s+<([^>]+)>').firstMatch(line);
+    if (importMatch == null) continue;
+
+    final importPath = (importMatch.group(1) ?? '').trim();
+    if (importPath.isEmpty || visited.contains(importPath)) continue;
+
+    final resolved = _resolveImportText(importPath, libraryFiles);
+    if (resolved == null) {
+      if (libraryFiles.isEmpty) {
+        throw StateError(
+          'Missing import <$importPath>. Load your DECL library folder first (for example: decl/stdlib).',
+        );
+      }
+      throw StateError(
+        'Missing import <$importPath> in loaded DECL libraries.',
+      );
+    }
+
+    visited.add(importPath);
+    final parsedImport = await parseDeclText(
+      resolved,
+      libraryFiles: libraryFiles,
+      visitedImports: visited,
+    );
+    final childComponents = parsedImport['components'] as List<dynamic>? ?? const [];
+    importedComponents.addAll(
+      childComponents.map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>)),
+    );
+  }
 
   final components = <Map<String, dynamic>>[];
   final schematics = <Map<String, dynamic>>[];
@@ -1876,9 +2003,63 @@ Map<String, dynamic> parseDeclText(String text) {
   }
 
   return {
-    'components': components,
+    'components': _mergeComponents(importedComponents, components),
     'schematics': schematics,
   };
+}
+
+List<Map<String, dynamic>> _mergeComponents(
+  List<Map<String, dynamic>> imported,
+  List<Map<String, dynamic>> local,
+) {
+  final mergedByName = <String, Map<String, dynamic>>{};
+  for (final c in imported) {
+    final name = c['name']?.toString() ?? '';
+    if (name.isNotEmpty) mergedByName[name] = c;
+  }
+  for (final c in local) {
+    final name = c['name']?.toString() ?? '';
+    if (name.isNotEmpty) mergedByName[name] = c;
+  }
+  return mergedByName.values.toList();
+}
+
+String? _resolveImportText(String importPath, Map<String, String> libraryFiles) {
+  final normalized = importPath.replaceAll('\\', '/');
+  final basename = normalized.split('/').last;
+  final candidates = <String>{
+    normalized,
+    normalized.startsWith('/') ? normalized.substring(1) : normalized,
+    'stdlib/$normalized',
+    'decl/$normalized',
+    'decl/stdlib/$normalized',
+    basename,
+  };
+  for (final key in candidates) {
+    final value = libraryFiles[key] ?? libraryFiles[key.toLowerCase()];
+    if (value != null) return value;
+  }
+  return null;
+}
+
+void _putLibraryPath(Map<String, String> map, String key, String content) {
+  if (key.isEmpty) return;
+  map[key] = content;
+  map[key.toLowerCase()] = content;
+}
+
+String _trimFirstPathSegment(String path) {
+  final normalized = path.replaceAll('\\', '/');
+  final firstSlash = normalized.indexOf('/');
+  if (firstSlash == -1 || firstSlash + 1 >= normalized.length) return normalized;
+  return normalized.substring(firstSlash + 1);
+}
+
+String _normalizeAfterMarker(String path, String marker) {
+  final normalized = path.replaceAll('\\', '/');
+  final idx = normalized.indexOf(marker);
+  if (idx == -1) return normalized;
+  return normalized.substring(idx + marker.length);
 }
 
 class _NetPinRef {
